@@ -3,3 +3,5 @@ librosa
 matplotlib
 pygame
 python-dotenv
+aiohttp
+sounddevice 
