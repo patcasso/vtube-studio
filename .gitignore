@@ -42,6 +42,7 @@ __pycache__/
 /gpt-vchat/audio
 /vts-test/audio
 /eleven-labs/audio
+/vts-test/temp_audio
 
 # logs
 /gpt-vchat/log

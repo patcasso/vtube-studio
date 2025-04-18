@@ -121,6 +121,18 @@ async def chat_with_character(websocket):
                         # Step 5 & 6: Play the audio with lip-sync
                         print(f"Playing response with synchronized mouth movements...")
                         await play_audio_with_mouth_sync(websocket, audio_path)
+
+                        # 대화 히스토리 로깅
+                        print("\n🗂️ Conversation History:")
+                        for message in conversation_history:
+                            role = message["role"]
+                            content = message["content"]
+                            if role == "system":
+                                print(f"🛠️ system prompt: {content}")
+                            elif role == "user":
+                                print(f"🧑 user: {content}")
+                            elif role == "assistant":
+                                print(f"🤖 assistant: {content}")
                     else:
                         print(
                             "Failed to generate speech. Check your API keys and network connection."
