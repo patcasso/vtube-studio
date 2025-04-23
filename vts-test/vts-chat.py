@@ -14,7 +14,8 @@ load_dotenv()
 VTUBE_STUDIO_AUTH_TOKEN = os.environ.get("VTUBE_STUDIO_AUTH_TOKEN")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 ELEVENLABS_API_KEY = os.environ.get("ELEVENLABS_API_KEY")
-ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID_JYP")  # Default voice
+# ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID_JYP")  # JYP voice
+ELEVENLABS_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID_OHW")  # OHW voice
 
 
 # Function to get a response from OpenAI API
@@ -48,6 +49,8 @@ async def get_ai_response(user_input):
 
 # Function to convert text to speech using ElevenLabs
 async def text_to_speech(text):
+    tts_start_time = time.time()  # TTS 시작 시간
+
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{ELEVENLABS_VOICE_ID}"
     headers = {
         "Accept": "audio/mpeg",
@@ -69,12 +72,18 @@ async def text_to_speech(text):
                 os.makedirs(os.path.dirname(audio_path), exist_ok=True)
                 with open(audio_path, "wb") as f:
                     f.write(await response.read())
+
+                tts_end_time = time.time()  # TTS 종료 시간
+                tts_duration = tts_end_time - tts_start_time
                 print(f"Speech saved to {audio_path}")
+                print(f"⏱️ TTS 처리 시간: {tts_duration:.2f}초")
+
                 return audio_path
             else:
                 error_text = await response.text()
                 print(f"Error from ElevenLabs API: {error_text}")
                 return None
+
 
 async def chat_with_character(websocket):
     # Initialize conversation history
@@ -89,10 +98,14 @@ async def chat_with_character(websocket):
         if user_input.lower() == "exit":
             return
 
+        total_start_time = time.time()  # 전체 처리 시작 시간
+
         # Add user message to conversation history
         conversation_history.append({"role": "user", "content": user_input})
 
         # Step 1 & 2: Get AI response from OpenAI API with full conversation history
+        llm_start_time = time.time()  # LLM 처리 시작 시간
+
         url = "https://api.openai.com/v1/chat/completions"
         headers = {
             "Content-Type": "application/json",
@@ -107,7 +120,11 @@ async def chat_with_character(websocket):
                     ai_response = response_json["choices"][0]["message"][
                         "content"
                     ].strip()
+
+                    llm_end_time = time.time()  # LLM 처리 종료 시간
+                    llm_duration = llm_end_time - llm_start_time
                     print(f"\nAI Response: {ai_response}")
+                    print(f"⏱️ LLM 응답 시간: {llm_duration:.2f}초")
 
                     # Add AI response to conversation history
                     conversation_history.append(
@@ -115,12 +132,33 @@ async def chat_with_character(websocket):
                     )
 
                     # Step 3 & 4: Convert AI response to speech using ElevenLabs
+                    tts_start_time = (
+                        time.time()
+                    )  # TTS 시작 시간 (함수 내에서도 측정하지만 여기서도 측정)
                     audio_path = await text_to_speech(ai_response)
+                    tts_end_time = time.time()  # TTS 종료 시간
+                    tts_duration = tts_end_time - tts_start_time
 
                     if audio_path:
                         # Step 5 & 6: Play the audio with lip-sync
                         print(f"Playing response with synchronized mouth movements...")
+                        lipsync_start_time = time.time()  # 립싱크 시작 시간
                         await play_audio_with_mouth_sync(websocket, audio_path)
+                        lipsync_end_time = time.time()  # 립싱크 종료 시간
+                        lipsync_duration = lipsync_end_time - lipsync_start_time
+                        print(f"⏱️ 립싱크 재생 시간: {lipsync_duration:.2f}초")
+
+                        # 전체 처리 시간 계산
+                        total_end_time = time.time()
+                        total_duration = total_end_time - total_start_time
+                        print(f"⏱️ 전체 처리 시간: {total_duration:.2f}초")
+
+                        # 시간 요약
+                        print("\n⏱️ 처리 시간 요약:")
+                        print(f"   - LLM 응답: {llm_duration:.2f}초")
+                        print(f"   - TTS 변환: {tts_duration:.2f}초")
+                        print(f"   - 립싱크 재생: {lipsync_duration:.2f}초")
+                        print(f"   - 총 소요 시간: {total_duration:.2f}초")
 
                         # 대화 히스토리 로깅
                         print("\n🗂️ Conversation History:")
@@ -145,6 +183,8 @@ async def chat_with_character(websocket):
 
 # Modified read_volume function to return both times and values
 def read_volume(audio_file_path):
+    analysis_start_time = time.time()  # 오디오 분석 시작 시간
+
     # Load the audio file
     y, sr = librosa.load(audio_file_path)
 
@@ -161,6 +201,10 @@ def read_volume(audio_file_path):
     normalized_rms = np.interp(rms, (0, rms.max()), (0, 1))
     mouth_values = normalized_rms * 3
 
+    analysis_end_time = time.time()  # 오디오 분석 종료 시간
+    analysis_duration = analysis_end_time - analysis_start_time
+    print(f"⏱️ 오디오 분석 시간: {analysis_duration:.2f}초")
+
     return times, mouth_values
 
 
@@ -171,6 +215,7 @@ async def play_audio_with_mouth_sync(websocket, audio_path):
     times, mouth_values = read_volume(audio_path)
 
     # 2. Create custom parameter if needed
+    param_start_time = time.time()  # 파라미터 생성 시작 시간
     creation_request = {
         "apiName": "VTubeStudioPublicAPI",
         "apiVersion": "1.0",
@@ -186,8 +231,12 @@ async def play_audio_with_mouth_sync(websocket, audio_path):
     }
     print("\n📌 Creating custom tracking parameter 'MouthOpenAmount'...")
     await send_api_request(creation_request, websocket)
+    param_end_time = time.time()  # 파라미터 생성 종료 시간
+    param_duration = param_end_time - param_start_time
+    print(f"⏱️ 파라미터 생성 시간: {param_duration:.2f}초")
 
     # 3. Prepare for synchronized playback
+    playback_start_time = time.time()  # 재생 준비 시작 시간
     print("Preparing for synchronized playback...")
     pygame.mixer.init()
     sound = pygame.mixer.Sound(audio_path)
@@ -200,6 +249,7 @@ async def play_audio_with_mouth_sync(websocket, audio_path):
     print("Starting audio playback and mouth animation...")
     sound.play()
     start_time = time.time()
+    print(f"⏱️ 재생 준비 시간: {start_time - playback_start_time:.2f}초")
 
     # 6. Main synchronization loop
     while current_frame < frame_count:
